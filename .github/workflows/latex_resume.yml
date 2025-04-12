@@ -1,0 +1,53 @@
+name: Build LaTeX document
+
+on:
+  push:
+    paths-ignore:
+      - 'resume.jpg'
+
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.TOKEN_GITHUB }}
+          fetch-depth: 0
+      
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v2
+        with:
+          root_file: main.tex
+      
+      - name: Uploading artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF
+          path: main.pdf
+      
+      - name: Install ghostscript & ImageMagick
+        run: sudo apt-get update --fix-missing && sudo apt install ghostscript imagemagick -y
+      
+      - name: Convert PDF to JPG
+        run: convert -density 300 -background white -alpha remove main.pdf -quality 90 resume.jpg
+      
+      - name: Commit JPG
+        id: commit
+        run: |
+          git config --local user.email "action[bot]@github.com"
+          git config --local user.name "github-actions[bot]"
+          git add resume.jpg
+          git commit -m "[bot] updated resume.jpg" || echo "No changes to commit"
+      
+      - name: Update README with latest resume
+        run: |
+          echo "![Resume](resume.jpg)" > README.md
+          git add README.md
+          git commit -m "[bot] Updated README with latest resume" || echo "No changes to commit"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.TOKEN_GITHUB }}
+          branch: ${{ github.ref_name }}
